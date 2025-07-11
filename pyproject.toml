@@ -1,0 +1,17 @@
+[project]
+name = "ephemeral-presentation"
+version = "0.1.0"
+description = "A2A Agent Framework with Sample Poetry Agent"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.25.0",
+    "fastapi>=0.100.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.20.0",
+    "aiofiles>=24.0.0",
+    "azure-cognitiveservices-speech>=1.40.0",
+    "python-a2a>=0.5.9",
+]
