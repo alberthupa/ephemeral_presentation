@@ -33,14 +33,20 @@ class BasicAgent(A2AServer):
         url: str = None,
         registry_url: str = None,
     ):
+        # Initialize the parent A2AServer class properly
+        super().__init__()
+
         self.name = name
         self.description = description
-
+        self.url = url
         self.registry_url = registry_url
         self._registration_retries = 3
         self._heartbeat_interval = 30  # seconds
         self._discovery_client = None
         self.llm_client = None
+
+        # Set required attributes for A2AServer compatibility
+        self._use_google_a2a = True  # This fixes the AttributeError
 
     async def setup(self):
         """Registers the agent with the registry."""

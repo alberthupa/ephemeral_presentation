@@ -318,3 +318,4 @@ if __name__ == "__main__":
     run_agent(args.name, agent_port, args.registry_url)
 
     # uv run agent_skeleton.py --registry-url "http://localhost:8000"
+    # uv run skeletons/a2a_skeleton_agent.py --registry-url "http://localhost:8000"
