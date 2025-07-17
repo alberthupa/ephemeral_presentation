@@ -17,6 +17,9 @@ from contextlib import asynccontextmanager
 from python_a2a import AgentCard
 from python_a2a.discovery import AgentRegistry
 
+# Constants for cleanup
+HEARTBEAT_TIMEOUT = 120  # seconds
+CLEANUP_INTERVAL = 120  # seconds
 
 # Data model for Agent registration
 class AgentRegistration(BaseModel):
@@ -37,9 +40,7 @@ registry_server = AgentRegistry(
     name="A2A Registry Server", description="Registry server for agent discovery"
 )
 
-# Constants for cleanup
-HEARTBEAT_TIMEOUT = 30  # seconds
-CLEANUP_INTERVAL = 10  # seconds
+
 
 
 @asynccontextmanager

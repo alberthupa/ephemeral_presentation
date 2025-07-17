@@ -96,25 +96,7 @@ class A2ANetwork:
 
 
 if __name__ == "__main__":
-    # Example usage
     registry_url = "http://localhost:8000"  # Replace with your actual registry URL
     network = A2ANetwork(registry_url)
 
-    agents = network.get_agents()
-    if agents:
-        """
-        print(f"Found {len(agents)} agents in the registry:")
-        for agent in agents:
-            print(
-                f"  - {agent.get('name', 'Unknown')}: {agent.get('description', 'No description')}"
-            )
-        """
-        query = "What is the weather like today?"
-        best_agent = network.find_best_agent(query)
-        # print(
-        #    f"The best agent for the query '{query}' is: {best_agent[0]} with confidence {best_agent[1]:.2f}"
-        # )
-        print("aaaa")
-        print(f"Best agent URL: {best_agent}")
-    else:
-        print("No agents found or an error occurred.")
+    

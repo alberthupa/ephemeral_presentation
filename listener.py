@@ -79,11 +79,9 @@ async def main():
 
             message_to_assesor = prep_a2a_message(text)
             try:
-                # Use async/await properly instead of run_in_executor
                 response = await asyncio.get_event_loop().run_in_executor(
                     None, lambda: asessors_client.send_message(message_to_assesor)
                 )
-                print(f"Response from assessor: {response}")
             except Exception as e:
                 print(f"Error sending message to assessor: {e}")
 
