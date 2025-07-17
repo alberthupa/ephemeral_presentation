@@ -157,18 +157,6 @@ class AssesorAgent(BasicAgent):
                     "processed": True,
                 }
 
-    def get_categorization_result(self, message_id: str) -> dict:
-        """Get the result of a categorization task"""
-        with self.processing_lock:
-            if message_id in self.processing_results:
-                result = self.processing_results[message_id]
-                if result.get("processed"):
-                    return result["result"]
-                else:
-                    return {"assessment": "processing", "message_id": message_id}
-            else:
-                return {"assessment": "not_found", "message_id": message_id}
-
     def handle_message(self, message: Message) -> Message:
         """Enhanced message handler with non-blocking categorization"""
         user_message = message.content.text
@@ -202,8 +190,133 @@ class AssesorAgent(BasicAgent):
             conversation_id=message.conversation_id,
         )
 
+    def get_categorization_result(self, message_id: str) -> dict:
+        # Get the result of a categorization task
+        """
+        The `get_categorization_result()` method is used to retrieve the results of background message categorization after the initial response has been sent. Here's how it works:
+
+        ## Usage Pattern:
+
+        1. **First**: `handle_message()` returns immediately with a message ID
+        2. **Later**: Use `get_categorization_result(message_id)` to check the actual categorization result
+
+        ## Example Usage:
+
+        ```python
+        # 1. Agent receives a message
+        message = Message(content=TextContent(text="I want to learn about data science presentations"))
+        response = agent.handle_message(message)
+        # response.content.text = "Message received and queued for categorization (ID: abc-123-def)"
+
+        # 2. After some time (seconds to minutes), check the result
+        result = agent.get_categorization_result("abc-123-def")
+        # Returns one of:
+        # {"assessment": "yes"} - message relates to presentations
+        # {"assessment": "no"} - message doesn't relate to presentations
+        # {"assessment": "processing"} - still being processed
+        # {"assessment": "error", "error": "..."} - processing failed
+        # {"assessment": "not_found"} - message ID doesn't exist
+        ```
+
+        ## Integration Options:
+
+        The method can be used in several ways:
+
+        1. **Polling**: Periodically check results
+        2. **Callback system**: Another agent could query results
+        3. **Storage**: Store results in a database for later retrieval
+        4. **Webhook**: Notify when processing completes
+
+        ## Typical Flow:
+
+        ```
+        Incoming Message → handle_message() → Immediate Response + Message ID
+                                                            ↓
+                                                    Background Processing
+                                                            ↓
+                                                get_categorization_result(ID) → Final Result
+        ```
+
+        This allows your agent to handle high message volumes without blocking, while still providing access to the actual categorization results when needed.
+
+        """
+        with self.processing_lock:
+            if message_id in self.processing_results:
+                result = self.processing_results[message_id]
+                if result.get("processed"):
+                    return result["result"]
+                else:
+                    return {"assessment": "processing", "message_id": message_id}
+            else:
+                return {"assessment": "not_found", "message_id": message_id}
+
     def cleanup_old_results(self, max_age_hours=24):
         """Clean up old processing results to prevent memory leaks"""
+        """
+            The `cleanup_old_results()` method is used to prevent memory leaks by removing old processing results from memory. Here's when and how to use it:
+
+            ## When to Use:
+
+            1. **Scheduled Cleanup**: Run periodically (e.g., every hour or daily)
+            2. **Memory Threshold**: When memory usage gets high
+            3. **Startup/Shutdown**: Clean during agent startup or graceful shutdown
+            4. **Batch Processing**: After processing large batches of messages
+
+            ## Usage Examples:
+
+            ```python
+            # 1. Scheduled cleanup (run every 6 hours)
+            import threading
+            import time
+
+            def scheduled_cleanup(agent):
+                while True:
+                    time.sleep(6 * 3600)  # 6 hours
+                    agent.cleanup_old_results(max_age_hours=24)
+
+            # Start background cleanup thread
+            cleanup_thread = threading.Thread(
+                target=scheduled_cleanup, 
+                args=(agent,), 
+                daemon=True
+            )
+            cleanup_thread.start()
+
+            # 2. Manual cleanup with custom age
+            agent.cleanup_old_results(max_age_hours=1)  # Remove results older than 1 hour
+
+            # 3. Cleanup on shutdown
+            def graceful_shutdown(agent):
+                agent.cleanup_old_results(max_age_hours=0)  # Clean all
+                agent.executor.shutdown(wait=True)
+            ```
+
+            ## Default Behavior:
+            - **Default**: Removes results older than 24 hours
+            - **Configurable**: Pass `max_age_hours` parameter to adjust
+            - **Thread-safe**: Uses locks to prevent race conditions
+
+            ## Typical Integration:
+
+            ```python
+            # Add to agent initialization
+            def __init__(...):
+                super().__init__(...)
+                # Start cleanup scheduler
+                self._start_cleanup_scheduler()
+
+            def _start_cleanup_scheduler(self):
+                def cleanup_worker():
+                    while True:
+                        time.sleep(3600)  # Run every hour
+                        self.cleanup_old_results(max_age_hours=6)
+                
+                cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+                cleanup_thread.start()
+            ```
+
+This prevents the `processing_results` dictionary from growing indefinitely as messages are processed over time.        
+        """
         current_time = time.time()
         max_age_seconds = max_age_hours * 3600
 
