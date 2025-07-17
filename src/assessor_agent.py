@@ -1,6 +1,11 @@
 import os
 import socket
 import logging
+import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+import json
+import time
 
 from python_a2a import (
     AgentCard,
@@ -95,42 +100,124 @@ class AssesorAgent(BasicAgent):
 
         self.llm_client = None  # Initialize LLM client to None
 
-    def categorize_message(self, message: str) -> dict:
-        if self.llm_client is None:
-            self.llm_client = LLMClient().get_client()
+        # Background processing setup
+        self.executor = ThreadPoolExecutor(max_workers=5)
+        self.processing_results = {}  # Store results for correlation
+        self.processing_lock = threading.Lock()
 
-        response = self.llm_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """Your role is to tell if a sentence relates to the content of a presentation. 
-                    Respond with a JSON object containing 'assessment' with values 'yes' or 'no'.""",
-                },
-                {"role": "user", "content": message},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        choice = response.choices[0].message.content
-        return choice
+    def categorize_message(self, message: str) -> dict:
+        """Categorize a message using LLM - runs in background thread"""
+        try:
+            if self.llm_client is None:
+                self.llm_client = LLMClient().get_client()
+
+            response = self.llm_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """Your role is to tell if a sentence relates to the content of a presentation. 
+                        Respond with a JSON object containing 'assessment' with values 'yes' or 'no'.""",
+                    },
+                    {"role": "user", "content": message},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0,
+            )
+            choice = response.choices[0].message.content
+            return json.loads(choice)
+        except Exception as e:
+            logger.error(f"Error categorizing message: {e}")
+            return {"assessment": "error", "error": str(e)}
+
+    def _process_message_async(self, message_id: str, user_message: str):
+        """Process message categorization in background thread"""
+        try:
+            logger.info(f"Starting background categorization for message: {message_id}")
+            result = self.categorize_message(user_message)
+
+            with self.processing_lock:
+                self.processing_results[message_id] = {
+                    "result": result,
+                    "timestamp": time.time(),
+                    "processed": True,
+                }
+
+            logger.info(
+                f"Completed categorization for message: {message_id}, result: {result}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error in background processing for message {message_id}: {e}"
+            )
+            with self.processing_lock:
+                self.processing_results[message_id] = {
+                    "result": {"assessment": "error", "error": str(e)},
+                    "timestamp": time.time(),
+                    "processed": True,
+                }
+
+    def get_categorization_result(self, message_id: str) -> dict:
+        """Get the result of a categorization task"""
+        with self.processing_lock:
+            if message_id in self.processing_results:
+                result = self.processing_results[message_id]
+                if result.get("processed"):
+                    return result["result"]
+                else:
+                    return {"assessment": "processing", "message_id": message_id}
+            else:
+                return {"assessment": "not_found", "message_id": message_id}
 
     def handle_message(self, message: Message) -> Message:
-        """Enhanced message handler with poetry generation capability."""
-        user_message = message.content.text.lower()
+        """Enhanced message handler with non-blocking categorization"""
+        user_message = message.content.text
         print(f"Message received: {user_message}")
 
-        # THIS PART IS TO BE UPDATED:
-        # HERE MUST BE A CODE TAING INCOMING  user_message TO categorize_message
-        # but it must start independent thread / process so that it does not block the main thread
+        # Generate unique ID for tracking this message
+        message_id = str(uuid.uuid4())
 
-        response_text = "wtf"
+        # Submit categorization task to background thread
+        future = self.executor.submit(
+            self._process_message_async, message_id, user_message
+        )
+
+        # Store initial tracking info
+        with self.processing_lock:
+            self.processing_results[message_id] = {
+                "future": future,
+                "original_message": user_message,
+                "timestamp": time.time(),
+                "processed": False,
+            }
+
+        # Return immediate response - categorization happens in background
+        response_text = (
+            f"Message received and queued for categorization (ID: {message_id})"
+        )
         return Message(
             content=TextContent(text=response_text),
             role=MessageRole.AGENT,
             parent_message_id=message.message_id,
             conversation_id=message.conversation_id,
         )
+
+    def cleanup_old_results(self, max_age_hours=24):
+        """Clean up old processing results to prevent memory leaks"""
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+
+        with self.processing_lock:
+            to_remove = []
+            for message_id, data in self.processing_results.items():
+                if current_time - data["timestamp"] > max_age_seconds:
+                    to_remove.append(message_id)
+
+            for message_id in to_remove:
+                del self.processing_results[message_id]
+
+            if to_remove:
+                logger.info(f"Cleaned up {len(to_remove)} old processing results")
 
 
 def run_agent(name: str = None, port: int = None, registry_url: str = None):
