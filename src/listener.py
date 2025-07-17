@@ -2,7 +2,7 @@ import asyncio, os, time
 import azure.cognitiveservices.speech as speechsdk
 from python_a2a import A2AClient, Message, TextContent, MessageRole
 
-from src.a2a_network import A2ANetwork
+from a2a_network import A2ANetwork
 
 from dotenv import load_dotenv
 
@@ -91,3 +91,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    # uv run src/listener.py

@@ -21,6 +21,7 @@ from python_a2a.discovery import AgentRegistry
 HEARTBEAT_TIMEOUT = 120  # seconds
 CLEANUP_INTERVAL = 120  # seconds
 
+
 # Data model for Agent registration
 class AgentRegistration(BaseModel):
     name: str
@@ -39,8 +40,6 @@ class HeartbeatRequest(BaseModel):
 registry_server = AgentRegistry(
     name="A2A Registry Server", description="Registry server for agent discovery"
 )
-
-
 
 
 @asynccontextmanager
@@ -133,3 +132,4 @@ async def get_agent(url: str):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    # uv run src/a2a_registry.py

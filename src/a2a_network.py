@@ -2,7 +2,7 @@ import json
 import requests
 from typing import Tuple
 
-from src.llm_client import LLMClient
+from llm_client import LLMClient
 
 
 class A2ANetwork:
@@ -43,8 +43,6 @@ class A2ANetwork:
 
         agent_descriptions = []
         for agent in agents:
-            print("aaaaaa")
-            print(agent)
             description = (
                 f"Agent Name: {agent['name']}\\n"
                 f"Description: {agent['description']}\\n"
@@ -98,5 +96,3 @@ class A2ANetwork:
 if __name__ == "__main__":
     registry_url = "http://localhost:8000"  # Replace with your actual registry URL
     network = A2ANetwork(registry_url)
-
-    

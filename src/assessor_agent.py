@@ -8,8 +8,13 @@ from python_a2a import (
     Message,
     TextContent,
     MessageRole,
+    run_server,
 )
+
+
 from basic_agent import BasicAgent
+from llm_client import LLMClient
+
 
 from dotenv import load_dotenv
 
@@ -88,26 +93,37 @@ class AssesorAgent(BasicAgent):
             },
         )
 
+        self.llm_client = None  # Initialize LLM client to None
+
+    def categorize_message(self, message: str) -> dict:
+        if self.llm_client is None:
+            self.llm_client = LLMClient().get_client()
+
+        response = self.llm_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """Your role is to tell if a sentence relates to the content of a presentation. 
+                    Respond with a JSON object containing 'assessment' with values 'yes' or 'no'.""",
+                },
+                {"role": "user", "content": message},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        choice = response.choices[0].message.content
+        return choice
+
     def handle_message(self, message: Message) -> Message:
         """Enhanced message handler with poetry generation capability."""
         user_message = message.content.text.lower()
-        print("hi, i am happy assesor")
         print(f"Message received: {user_message}")
-        """
-        if "poem" in user_message or "poetry" in user_message:
-            # Extract topic (simple approach)
-            topic = "life"  # default
-            if "about" in user_message:
-                parts = user_message.split("about")
-                if len(parts) > 1:
-                    topic = parts[1].strip()
 
-            poem = self.generate_poetry(topic)
-            response_text = f"Here's a poem about {topic}:\\n\\n{poem}"
-        else:
-            # Default response
-            response_text = f"Hello from {self.agent_card.name}! I received: {message.content.text}\\n\\nI can write poetry for you! Just ask me to write a poem about something."
-        """
+        # THIS PART IS TO BE UPDATED:
+        # HERE MUST BE A CODE TAING INCOMING  user_message TO categorize_message
+        # but it must start independent thread / process so that it does not block the main thread
+
         response_text = "wtf"
         return Message(
             content=TextContent(text=response_text),
@@ -119,7 +135,6 @@ class AssesorAgent(BasicAgent):
 
 def run_agent(name: str = None, port: int = None, registry_url: str = None):
     """Runs a sample agent that registers with the specified registry."""
-    from python_a2a import run_server
 
     # Use provided port or find a free one
     if port is None:
@@ -172,5 +187,4 @@ if __name__ == "__main__":
     run_agent(args.name, args.port, args.registry_url)
 
 # Example usage:
-# uv run agents/sample_agent.py --demo
-# uv run src/agents/assessor_agent.py --name "AssessorAgent" --port 8001 --registry-url "http://localhost:8000"
+# uv run src/assessor_agent.py --name "AssessorAgent" --port 8001 --registry-url "http://localhost:8000"
